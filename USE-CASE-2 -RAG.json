@@ -1,0 +1,514 @@
+{
+  "name": "USE-CASE-2 -RAG",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "upload-file",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -512,
+        224
+      ],
+      "id": "46c862e2-04ad-4c4b-ab75-3afd82126047",
+      "name": "Webhook",
+      "webhookId": "d781ad1c-291b-4e30-9aa3-5024350d2ab7"
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        -320,
+        96
+      ],
+      "id": "a4d57ddb-d5fd-4699-be33-09d00112d709",
+      "name": "Extract from File"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://utvjrjhggmusphgcjtbb.supabase.co/rest/v1/documents",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV0dmpyamhnZ211c3BoZ2NqdGJiIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NjE4MDU0NSwiZXhwIjoyMDgxNzU2NTQ1fQ.wDBrVYKJ3cIgCO35ivoZu-hUnRrxV5sXj0MKbNGIcTM"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV0dmpyamhnZ211c3BoZ2NqdGJiIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NjE4MDU0NSwiZXhwIjoyMDgxNzU2NTQ1fQ.wDBrVYKJ3cIgCO35ivoZu-hUnRrxV5sXj0MKbNGIcTM"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "chunk_id",
+              "value": "={{ $json.id }}"
+            },
+            {
+              "name": "content",
+              "value": "={{ $json.text }}"
+            },
+            {
+              "name": "embedding",
+              "value": "={{ $json.embedding }}"
+            },
+            {
+              "name": "source",
+              "value": "={{ $json.source }}"
+            },
+            {
+              "name": "page_count",
+              "value": "={{ $json.page_count }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        928,
+        256
+      ],
+      "id": "cb6cdcd4-deb2-4472-9de3-16affe8de3f0",
+      "name": "Supabase Insert"
+    },
+    {
+      "parameters": {
+        "jsCode": "const text = $json.text || \"\";\nconst chunkSize = 800;     // characters\nconst overlap = 150;       // overlap between chunks\n\nconst chunks = [];\nlet start = 0;\nlet index = 0;\n\nwhile (start < text.length) {\n  const end = start + chunkSize;\n  const chunkText = text.slice(start, end);\n\n  chunks.push({\n    json: {\n      chunk_id: index,\n      content: chunkText,\n      source: \"Comprehensive Joule Skill Development Guidelines\",\n      page_count: $json.numpages || null\n    }\n  });\n\n  start += chunkSize - overlap;\n  index++;\n}\n\nreturn chunks;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -208,
+        304
+      ],
+      "id": "160b5a2e-5519-4a65-881c-21bae7c597cf",
+      "name": "Code in JavaScript-Chunking"
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map(item => ({\n  json: {\n    // ✅ ONLY Gemini-compatible payload\n    body: JSON.stringify({\n      content: {\n        parts: [{ text: item.json.content }]\n      }\n    }),\n\n    // ✅ metadata stays OUTSIDE body\n    content: item.json.content,\n    source: item.json.source,\n    chunk_id: item.json.chunk_id\n  }\n}));\n\n\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -16,
+        96
+      ],
+      "id": "4f62a54f-42c4-4156-95fd-7623957929af",
+      "name": "Code in JavaScript1-wrap chunks for embedding API"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=AIzaSyCk3iW177ljrML1yHWspijbTubE4czEZCo",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "JSON",
+        "body": "={{ $json.body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        256,
+        96
+      ],
+      "id": "50dcbd77-0062-411c-aaaa-b32028e5982c",
+      "name": "HTTP Request-Gemini –Embeddings",
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        448,
+        288
+      ],
+      "id": "a04fd866-8751-4551-a9ca-ddf1aa8b3434",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map(item => {\n  return {\n    json: {\n      id: item.json.chunk_id,\n      text: item.json.content,\n      embedding: item.json.embedding.values,\n      source: item.json.source,\n      page_count: item.json.page_count\n      \n    }\n  };\n});\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        608,
+        80
+      ],
+      "id": "7fd2e89f-eda0-4f23-8a25-71666516fa41",
+      "name": "Normalize for Vector Storage"
+    },
+    {
+      "parameters": {
+        "method": "DELETE",
+        "url": "https://utvjrjhggmusphgcjtbb.supabase.co/rest/v1/documents?id=is.not.null",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV0dmpyamhnZ211c3BoZ2NqdGJiIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NjE4MDU0NSwiZXhwIjoyMDgxNzU2NTQ1fQ.wDBrVYKJ3cIgCO35ivoZu-hUnRrxV5sXj0MKbNGIcTM"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV0dmpyamhnZ211c3BoZ2NqdGJiIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NjE4MDU0NSwiZXhwIjoyMDgxNzU2NTQ1fQ.wDBrVYKJ3cIgCO35ivoZu-hUnRrxV5sXj0MKbNGIcTM"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1024,
+        -192
+      ],
+      "id": "88964170-deb8-43b0-bac7-aca5ab999816",
+      "name": "Supabase Delete"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=AIzaSyCk3iW177ljrML1yHWspijbTubE4czEZCo",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"content\": {\n    \"parts\": [\n      {\n        \"text\": \"{{ $json.chatInput }}\"\n      }\n    ]\n  }\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -32,
+        640
+      ],
+      "id": "bf520383-e1f8-4718-bd8a-53e2e48864e2",
+      "name": "HTTP Request-Gemini –Embeddings for user input",
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        1616,
+        256
+      ],
+      "id": "1804e67d-df8d-48f9-8942-a830cd6dc1c7",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        -400,
+        656
+      ],
+      "id": "bf49ffd6-cf69-4753-a504-084581968094",
+      "name": "When chat message received",
+      "webhookId": "bb49755d-da51-4d37-ae7b-98374f257a88"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://utvjrjhggmusphgcjtbb.supabase.co/rest/v1/rpc/match_documents",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV0dmpyamhnZ211c3BoZ2NqdGJiIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NjE4MDU0NSwiZXhwIjoyMDgxNzU2NTQ1fQ.wDBrVYKJ3cIgCO35ivoZu-hUnRrxV5sXj0MKbNGIcTM"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV0dmpyamhnZ211c3BoZ2NqdGJiIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NjE4MDU0NSwiZXhwIjoyMDgxNzU2NTQ1fQ.wDBrVYKJ3cIgCO35ivoZu-hUnRrxV5sXj0MKbNGIcTM"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"query_embedding\": {{ JSON.stringify($json.embedding.values) }},\n  \"match_count\": 5\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        224,
+        624
+      ],
+      "id": "08c45da6-eb9a-4c4f-b9dd-9079f45e3e4a",
+      "name": "Supabase vector search"
+    },
+    {
+      "parameters": {
+        "jsCode": "const docs = items\n  .filter(item => item.json.content)\n  .map(item => {\n    return `SOURCE: ${item.json.source}\\n${item.json.content}`;\n  });\n\nreturn [\n  {\n    json: {\n      context: docs.join(\"\\n\\n---\\n\\n\")\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        432,
+        624
+      ],
+      "id": "4aed2727-150c-4058-bfa5-14ed3d8d94a4",
+      "name": "Build RAG context"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-2.5-flash",
+          "mode": "list",
+          "cachedResultName": "models/gemini-2.5-flash"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=You are an AI assistant answering questions using the provided context.\n\nContext:\n{{ $json.context }}\n\nQuestion:\n{{ $node[\"When chat message received\"].json.chatInput }}\n\nInstructions:\n- Answer ONLY using the context\n- Be concise and precise\n- If the answer is not present, say \"I don't know based on the provided documents\"\n\n\nQuestion:\n{{ $node[\"When chat message received\"].json.chatInput }}\n\nInstructions:\n- Answer ONLY using the context\n- Be concise and precise\n- If the answer is not present, say \"I don't know based on the provided documents\"\n"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1,
+      "position": [
+        720,
+        624
+      ],
+      "id": "2515f121-49b1-43d2-9e67-bd4607b09319",
+      "name": "Message a model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "JeCXCflK85jnnagK",
+          "name": "Google Gemini(PaLM) Api account 3"
+        }
+      }
+    }
+  ],
+  "pinData": {
+    "Extract from File": [
+      {
+        "json": {
+          "numpages": 6,
+          "numrender": 6,
+          "info": {
+            "PDFFormatVersion": "1.7",
+            "Language": "en",
+            "EncryptFilterName": null,
+            "IsLinearized": false,
+            "IsAcroFormPresent": false,
+            "IsXFAPresent": false,
+            "IsCollectionPresent": false,
+            "IsSignaturesPresent": false,
+            "Creator": "Microsoft Word",
+            "CreationDate": "D:20251219115950-08'00'",
+            "ModDate": "D:20251219115950-08'00'"
+          },
+          "metadata": {
+            "xmp:creatortool": "Microsoft Word",
+            "xmp:createdate": "2025-12-19T11:59:50-08:00",
+            "xmp:modifydate": "2025-12-19T11:59:50-08:00",
+            "xmpmm:documentid": "uuid:ABFBF4A1-15BE-4EF2-8567-32F8E65F1A27",
+            "xmpmm:instanceid": "uuid:ABFBF4A1-15BE-4EF2-8567-32F8E65F1A27"
+          },
+          "text": "Comprehensive Joule Skill Development Guidelines\nVersion 1.0\nIntroduction\nWelcome to the official development guide for Joule, SAP's AI copilot. This document provides\na comprehensive set of standards, best practices, and governance principles for creating,\ndeploying, and managing robust, user-friendly custom skills using Joule Studio. Adhering to\nthese guidelines is mandatory to ensure all skills are efficient, maintainable, secure, and deliver\na seamless, high-quality experience to the end-user.\nPhase 0: Prerequisite Setup and Security\nBefore any development can begin, the foundational landscape and developer authorizations\nmust be correctly configured. This phase is the essential starting point for all Joule Studio\ndevelopment.\n1. System and Subscription Prerequisites\nEnsure the following components are in place within your SAP Business Technology Platform\n(BTP) global account:\n1. Core Subscriptions: You must have active subscriptions for:\n○ SAP Build: Using the build-default service plan.\n○ SAP Build Process Automation: Within a dedicated SAP BTP subaccount.\n○ Joule: The AI copilot itself.\n○ SAP Cloud Identity Services: For all user authentication and authorization.\n2. Establish Trust: A trust relationship must be configured between Joule and your SAP\nCloud Identity Services tenant.\n3. Run the \"Setting Up Joule\" Booster: This is the most critical setup step. Run this\nbooster from the SAP BTP cockpit to create a \"formation\" that formally links your Joule\nand SAP Build Process Automation instances and sets up the necessary communication\ndependencies.\n4. Browser Support: Joule Studio development is supported only on Google Chrome\nand Microsoft Edge.\n2. Essential Security Roles for Developers\nJoule Studio requires permissions from two separate systems. A developer must be assigned\nthe correct roles in both BTP subaccounts to perform their tasks.\n\nSystem Subaccount Role Collection Purpose\nSAP\nBuild\nSAP Build\nSubaccount\nProcessAutomationDevelop\ner\n(Mandatory) Allows creating and\nmanaging the underlying\nprocesses and automations.\nJoule Joule\nSubaccount\nextensibility_developer (Mandatory) Grants authorization\nto develop, compile, and deploy\ncustom skills in Joule Studio.\nPhase 1: Analysis & Discovery - The \"Build Smart, Not Hard\" Approach\nBefore building anything new, investigate existing resources to accelerate development and\nensure alignment with SAP standards.\n1.1. Check for Standard Fiori Apps and OData Services\nFor many use cases, SAP has already provided a standard Fiori application.\n● Guideline: Before designing a new skill, thoroughly search for a standard Fiori app that\naddresses your business requirement.\n● Action: If a suitable app exists, identify its underlying OData service. This can be reused\nas the API for your Joule skill, leveraging a stable and feature-rich foundation.\n1.2. Verify the SAP Business Accelerator Hub (for Public Cloud)\nThe SAP Business Accelerator Hub is the central catalog for all standard SAP APIs.\n● Guideline: For any development in the Public Cloud landscape, developers must first\nverify the Business Accelerator Hub for a suitable standard API.\n● Benefit: This prevents the unnecessary creation of custom APIs when a standard, well-\ndocumented, and SAP-supported API is already available.\nPhase 2: Environment and Project Setup\nA structured foundation is key to a manageable and scalable development lifecycle.\n● Dedicated Subaccounts: Development for Public Cloud and On-Premise landscapes\nmust be segregated into their own dedicated SAP BTP subaccounts.\n\n● A Single Source of Truth: Within each subaccount, all development must take place in\na single, centralized Joule Studio project. All developers will contribute their skills to\nthis one project.\n● Unified Deployment Target: To guarantee smooth transport between tenants (e.g.,\nDev -> QA -> Prod), all Joule skills from the project must be deployed to one\ndesignated environment.\nPhase 3: Core Skill Development Best Practices\nThis phase details the \"how-to\" of building high-quality skills.\n3.1. Conversational Design (UX) Principles\nThe user experience is paramount. A skill must be intuitive and easy to interact with.\n● Be Concise, Be Clear: Joule responses should be short and to the point. Avoid\ntechnical jargon.\n● Manage Expectations: If a skill will take time, let the user know. For example, \"Okay,\nI'm retrieving your sales report. This might take a moment.\"\n● Guide the User: If a user's request is ambiguous, guide them. Instead of \"Invalid\nrequest,\" try \"To get a sales order, I need the order number. Could you please provide\nit?\"\n● Confirm Destructive Actions: Before executing a skill that creates, updates, or deletes\ndata, always ask for confirmation. For example, \"You want to cancel purchase order\n4500123. Is that correct?\"\n3.2. Error Handling and Resilience Strategy\nA robust skill anticipates and gracefully handles different failure points.\nError Type Description Handling Strategy\nTechnical\nError\nThe API is down or\nmisconfigured (e.g.,\n500, 401 errors).\nUse a Condition to check the API status. Provide a\ngeneric message: \"I'm sorry, I'm having trouble\nconnecting to the system. Please try again later.\" Do\nnot expose technical error codes to the user.\nFunctional\nError\nThe API works, but the\nuser's request yields no\nresults.\nUse a Condition to check if the response payload is\nempty. Provide a clear message: \"I couldn't find a\nbusiness partner with that ID. Please check the\nnumber.\"\n\nInput\nValidation\nThe user provides\ninvalid input.\nUse a Condition at the start of the skill to check the\ninput and guide the user if it's incorrect.\n3.3. Performance and Optimization\n● API Timeouts: Joule skills have a total execution time limit of 4 minutes. Design skills\nand API calls to be fast.\n● Payload Size: Use API parameters like $top, $select, and $filter to only retrieve the data\nyou need. The response content size limit is 100 KB.\n● Long-Running Tasks: For processes that take several minutes, the Joule skill should\ntrigger an asynchronous process in SAP Build Process Automation and inform the\nuser that they will be notified when it's complete.\n3.4. Modularity: Creating Reusable Actions\n● Don't Repeat Yourself (DRY): Avoid defining the same API call in multiple skills.\nInstead, create a single, generic Action Project for a widely used API that other\ndevelopers can consume.\n● I/O: Design Joule Skills with input and output, so that it can be reused by other skills if\nrequired.\n3.5. Integrating with SAP Build Process Automation\n● How it Works: You can add an \"Add a Process\" or \"Add an Automation\" step to your\nskill flow.\n● Important Context (Fire-and-Forget): When a Joule skill calls a process or automation,\nit is a \"fire-and-forget\" task. The skill starts the process and immediately moves on\nwithout waiting for a result from that process.\nPhase 4: Testing and Quality Assurance (QA)\nEvery skill must be rigorously tested before it is released.\n4.1. Action-Level Testing (Unit Tests)\n\nBefore using an Action in a skill, test it thoroughly in the Action Editor's Test console. Verify\nall inputs, authentication, and output schemas for both successful and unsuccessful calls.\n4.2. Skill-Flow Testing (Integration Tests)\nWithin the Joule Studio editor, test the entire logic of your skill. Manually check that conditions\nbranch correctly, messages are displayed as intended, and data flows properly between steps.\n4.3. Conversational Testing (User Acceptance Testing - UAT)\nThis is the most critical testing stage.\n● Use the Joule Debug Mode: Deploy the skill to your test environment and launch the\nJoule Web Client. Use the Debug option to get a real-time trace of how Joule is\ninterpreting the conversation.\n● Test Scenarios, Not Just Commands: Create a list of test scenarios. Test variations\nand potential user errors, not just the \"happy path.\"\nPhase 5: Deployment and Lifecycle Management\n5.1. Versioning and Release Management Strategy\nUse semantic versioning (MAJOR.MINOR.PATCH) when releasing your project.\n● Patch (1.0.1): For bug fixes that don't change functionality.\n● Minor (1.1.0): For backward-compatible new features.\n● Major (2.0.0): For breaking changes that might impact dependent projects.\n5.2. Post-Deployment Monitoring and Maintenance\nDevelopment doesn't end at deployment. Periodically review Joule's logs and user feedback to\nidentify skills that are failing or underperforming and schedule them for maintenance.\nAppendix A: Documentation Standards\n1. Skill Description: The in-skill description in Joule Studio is the primary documentation\nand must clearly state the purpose, required inputs, and expected outputs. For any\nautomated process that you expect joule to follow, then describe that over here.\n\n2. Project README.md: The centralized Joule project should contain a README.md file\nthat lists all skills in the project, their owners, and a brief description.\nAppendix B: Governance and Ownership\n● Skill Owner: Each skill must have a designated \"Skill Owner\" responsible for its\nmaintenance and lifecycle.\n● Review Process: Before a skill is deployed to a production environment, it must be\npeer-reviewed by another developer and approved by a designated project lead.\nAppendix C: Known Limitations\nBe aware of the following platform limitations when designing and building your Joule skills:\n● Authorization & Sharing: Projects can only be shared with a maximum of 10 user\ngroups or 5 individual users. A mix of user groups and individuals is not permitted.\n● Deployment Times: Deploying Joule skills to a shared environment in a production\ntenant can take up to 30 minutes.\n● Process Automation Integration: A Joule Skill can start a process, but the results\nfrom that process cannot be integrated back into the Joule skill's flow.\n● Parameter Handling: Manually typing a value for an input/output and then deleting it\ncan cause errors when the skill runs. Entering only a space (\" \") as a parameter value\ncan lead to deployment errors.\n● Data Type and Object Binding: Using complex data types as input and mapping them\nto different fields (object binding) can lead to errors when the skill is launched in Joule.\nConclusion\nBy adhering to these guidelines, development teams can build powerful, reliable, and user-\nfriendly skills that effectively extend the capabilities of Joule, providing significant value to the\norganization.",
+          "version": "5.3.31"
+        },
+        "binary": {},
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Extract from File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript-Chunking",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript-Chunking": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1-wrap chunks for embedding API",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1-wrap chunks for embedding API": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request-Gemini –Embeddings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request-Gemini –Embeddings": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Normalize for Vector Storage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize for Vector Storage": {
+      "main": [
+        [
+          {
+            "node": "Supabase Insert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase Delete": {
+      "main": [
+        []
+      ]
+    },
+    "Supabase Insert": {
+      "main": [
+        []
+      ]
+    },
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request-Gemini –Embeddings for user input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request-Gemini –Embeddings for user input": {
+      "main": [
+        [
+          {
+            "node": "Supabase vector search",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase vector search": {
+      "main": [
+        [
+          {
+            "node": "Build RAG context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build RAG context": {
+      "main": [
+        [
+          {
+            "node": "Message a model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "87738dd8-54f8-457f-955d-95eef5c2712f",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "508e0ce8cc92e0c0a0ee5fc95712f772b4796511f5e6a2cedab9ba87f670c639"
+  },
+  "id": "8iAd9R6g2gZvLQ0w",
+  "tags": []
+}
